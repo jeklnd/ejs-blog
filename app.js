@@ -3,12 +3,24 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
 const _ = require("lodash");
+const mongoose = require("mongoose");
+require("dotenv").config()
 
 // initializations
 const app = express();
 app.set("view engine", "ejs");
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static("public"));
+
+// connect to database
+mongoose.set('strictQuery', true);
+mongoose.connect(process.env.MONGO_URL);
+
+// define collections
+const Post = new mongoose.model("Post", postSchema = new mongoose.Schema ({
+  title: String, 
+  body: String,
+}));
 
 // default content
 const homeContent ="Lacus vel facilisis volutpat est velit egestas dui id ornare. Semper auctor neque vitae tempus quam. Sit amet cursus sit amet dictum sit amet justo. Viverra tellus in hac habitasse. Imperdiet proin fermentum leo vel orci porta. Donec ultrices tincidunt arcu non sodales neque sodales ut. Mattis molestie a iaculis at erat pellentesque adipiscing. Magnis dis parturient montes nascetur ridiculus mus mauris vitae ultricies. Adipiscing elit ut aliquam purus sit amet luctus venenatis lectus. Ultrices vitae auctor eu augue ut lectus arcu bibendum at. Odio euismod lacinia at quis risus sed vulputate odio ut. Cursus mattis molestie a iaculis at erat pellentesque adipiscing.";
@@ -18,9 +30,15 @@ const posts = [];
 
 // routes
 app.get("/", (req, res) => {
-  res.render("home.ejs", {
-    homeContent: homeContent,
-    posts: posts,
+  Post.find((err, result) => {
+    if (err) {
+      console.log(err);
+    } else {
+      res.render("home.ejs", {
+        homeContent: homeContent,
+        posts: result,
+      });
+    }
   });
 });
 
@@ -37,31 +55,50 @@ app.get("/compose", (req, res) => {
 });
 
 app.post("/compose", (req, res) => {
-  const titleInput = req.body.titleInput;
-  const postInput = req.body.postInput;
-  const obj = {
-    titleInput: titleInput,
-    postInput: postInput,
-    kebabTitle: _.kebabCase(titleInput),
-  };
-  posts.push(obj);
-  res.redirect("/");
-  // res.render("compose.ejs", obj);}
+  const newPostTitle = req.body.newPostTitle;
+  const newPostBody = req.body.newPostBody;
+  const newPost = new Post({title: newPostTitle, body: newPostBody});
+  newPost.save((err, result) => {
+    if (err) {
+      console.log(err);
+    } else {
+      console.log('New post saved successfully');
+      res.redirect("/");
+    }
+  });
+
+  
 });
 
-app.get("/posts/:id", (req, res) => {
-  const id = req.params.id;
-
-  // console.log(id);
-  posts.forEach((post) => {
-    if (_.kebabCase(post.titleInput) === id) {
-      console.log("Match found");
-      res.render("post.ejs", {
-        titleInput: post.titleInput,
-        postInput: post.postInput,
-      });
+app.get("/posts/:postId", (req, res) => {
+  const postId = req.params.postId;
+  Post.findById(postId, (err, result) => {
+    if (err) {
+      console.log(err);
     } else {
-      console.log("No match found");
+        res.render("post.ejs", {
+          newPostTitle: result.title,
+          newPostBody: result.body,
+          postId: postId,
+        });
+    }
+  });
+});
+
+app.post("/delete", (req, res) => {
+  const idForDeletion = req.body.idForDeletion;  
+  Post.findById(idForDeletion, (err, result) => {
+    if (err) {
+      console.log(err);
+    } else {
+      Post.findByIdAndDelete({_id: idForDeletion}, (err, result) => {
+        if (err) {
+          console.log(err);
+        } else {
+          console.log('Post deleted successfully');
+          res.redirect("/");
+        }
+      });
     }
   });
 });
